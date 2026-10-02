@@ -1,0 +1,1038 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>俄羅斯方塊</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background:
+            radial-gradient(circle at top, #25345f 0%, #101426 45%, #080b14 100%);
+        color: white;
+        font-family: Arial, "Microsoft JhengHei", sans-serif;
+        user-select: none;
+    }
+
+    .game {
+        display: flex;
+        gap: 22px;
+        padding: 24px;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 20px;
+        background: rgba(12,16,30,.92);
+        box-shadow:
+            0 25px 80px rgba(0,0,0,.5),
+            inset 0 1px rgba(255,255,255,.08);
+    }
+
+    .left {
+        position: relative;
+    }
+
+    canvas {
+        display: block;
+        background: #080b14;
+        border-radius: 8px;
+    }
+
+    #board {
+        width: 300px;
+        height: 600px;
+        border: 2px solid #313955;
+    }
+
+    .side {
+        width: 180px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    h1 {
+        margin: 0 0 4px;
+        font-size: 27px;
+        letter-spacing: 2px;
+    }
+
+    .panel {
+        padding: 13px;
+        border-radius: 12px;
+        background: #171d32;
+        border: 1px solid #2a3351;
+    }
+
+    .label {
+        color: #8994b5;
+        font-size: 12px;
+        margin-bottom: 5px;
+    }
+
+    .value {
+        font-size: 24px;
+        font-weight: bold;
+    }
+
+    #next {
+        width: 140px;
+        height: 100px;
+        margin: auto;
+    }
+
+    button {
+        width: 100%;
+        padding: 11px 10px;
+        border: 0;
+        border-radius: 9px;
+        color: white;
+        background: #33406b;
+        cursor: pointer;
+        font-weight: bold;
+        transition: .15s;
+    }
+
+    button:hover {
+        background: #455587;
+        transform: translateY(-1px);
+    }
+
+    button:active {
+        transform: translateY(1px);
+    }
+
+    .sound-on {
+        background: #246b52;
+    }
+
+    .controls {
+        color: #9da7c4;
+        font-size: 12px;
+        line-height: 1.8;
+    }
+
+    .overlay {
+        position: absolute;
+        inset: 2px;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        border-radius: 6px;
+        background: rgba(4,6,12,.82);
+        backdrop-filter: blur(4px);
+        z-index: 5;
+    }
+
+    .overlay.show {
+        display: flex;
+    }
+
+    .overlay h2 {
+        margin: 0 0 8px;
+        font-size: 32px;
+    }
+
+    .overlay p {
+        margin: 0 0 16px;
+        color: #aeb8d4;
+    }
+
+    .mobile-controls {
+        display: none;
+        margin-top: 14px;
+        gap: 7px;
+        grid-template-columns: repeat(5, 1fr);
+    }
+
+    .mobile-controls button {
+        padding: 14px 5px;
+        font-size: 18px;
+    }
+
+    @media (max-width: 650px) {
+        body {
+            align-items: flex-start;
+            padding-top: 12px;
+        }
+
+        .game {
+            padding: 12px;
+            gap: 10px;
+            border: 0;
+            box-shadow: none;
+            background: transparent;
+        }
+
+        .side {
+            width: 125px;
+        }
+
+        #board {
+            width: min(60vw, 300px);
+            height: auto;
+            aspect-ratio: 1 / 2;
+        }
+
+        #next {
+            width: 110px;
+            height: 80px;
+        }
+
+        .mobile-controls {
+            display: grid;
+        }
+
+        .controls {
+            display: none;
+        }
+
+        h1 {
+            font-size: 20px;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+<div class="game">
+
+    <div class="left">
+        <canvas id="board" width="300" height="600"></canvas>
+
+        <div id="overlay" class="overlay">
+            <h2 id="overlayTitle">遊戲結束</h2>
+            <p id="overlayText">你的分數：0</p>
+            <button onclick="restart()">重新開始</button>
+        </div>
+
+        <div class="mobile-controls">
+            <button onclick="move(-1)">←</button>
+            <button onclick="rotate()">↻</button>
+            <button onclick="softDrop()">↓</button>
+            <button onclick="hardDrop()">⤓</button>
+            <button onclick="move(1)">→</button>
+        </div>
+    </div>
+
+    <div class="side">
+
+        <h1>俄羅斯方塊</h1>
+
+        <div class="panel">
+            <div class="label">SCORE</div>
+            <div class="value" id="score">0</div>
+        </div>
+
+        <div class="panel">
+            <div class="label">LINES</div>
+            <div class="value" id="lines">0</div>
+        </div>
+
+        <div class="panel">
+            <div class="label">LEVEL</div>
+            <div class="value" id="level">1</div>
+        </div>
+
+        <div class="panel">
+            <div class="label">最高分</div>
+            <div class="value" id="highScore">0</div>
+        </div>
+
+        <div class="panel">
+            <div class="label">NEXT</div>
+            <canvas id="next" width="140" height="100"></canvas>
+        </div>
+
+        <button onclick="restart()">重新開始</button>
+        <button onclick="togglePause()" id="pauseBtn">⏸ 暫停</button>
+        <button onclick="toggleSound()" id="soundBtn" class="sound-on">
+            🔊 音效：開
+        </button>
+
+        <div class="panel controls">
+            <b>鍵盤操作</b><br>
+            ← →　移動<br>
+            ↑　旋轉<br>
+            ↓　加速下降<br>
+            Space　直接落下<br>
+            P　暫停<br>
+            M　音效開關
+        </div>
+
+    </div>
+</div>
+
+<script>
+/* =========================================================
+   俄羅斯方塊
+   ========================================================= */
+
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d");
+
+const nextCanvas = document.getElementById("next");
+const nextCtx = nextCanvas.getContext("2d");
+
+const COLS = 10;
+const ROWS = 20;
+const BLOCK = 30;
+
+const colors = [
+    null,
+    "#00e5ff", // I
+    "#ffe600", // O
+    "#b45cff", // T
+    "#4cff6b", // S
+    "#ff4f70", // Z
+    "#4c8dff", // J
+    "#ff9d32"  // L
+];
+
+const pieces = {
+    I: [
+        [1,1,1,1]
+    ],
+
+    O: [
+        [2,2],
+        [2,2]
+    ],
+
+    T: [
+        [0,3,0],
+        [3,3,3]
+    ],
+
+    S: [
+        [0,4,4],
+        [4,4,0]
+    ],
+
+    Z: [
+        [5,5,0],
+        [0,5,5]
+    ],
+
+    J: [
+        [6,0,0],
+        [6,6,6]
+    ],
+
+    L: [
+        [0,0,7],
+        [7,7,7]
+    ]
+};
+
+let board;
+let current;
+let nextPiece;
+
+let score = 0;
+let lines = 0;
+let level = 1;
+
+let dropCounter = 0;
+let lastTime = 0;
+let dropInterval = 800;
+
+let paused = false;
+let gameOver = false;
+
+let soundEnabled = true;
+let audioContext = null;
+
+let highScore =
+    Number(localStorage.getItem("tetrisHighScore")) || 0;
+
+document.getElementById("highScore").textContent = highScore;
+
+
+/* =========================
+   音效
+   ========================= */
+
+function initAudio() {
+    if (!audioContext) {
+        audioContext =
+            new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    if (audioContext.state === "suspended") {
+        audioContext.resume();
+    }
+}
+
+function beep(frequency, duration, type = "square", volume = 0.045) {
+    if (!soundEnabled) return;
+
+    initAudio();
+
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.value = frequency;
+
+    gain.gain.setValueAtTime(volume, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioContext.currentTime + duration
+    );
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + duration);
+}
+
+function soundMove() {
+    beep(220, .045, "square", .025);
+}
+
+function soundRotate() {
+    beep(420, .07, "triangle", .035);
+}
+
+function soundDrop() {
+    beep(110, .08, "square", .04);
+}
+
+function soundLine() {
+    beep(660, .08, "square", .045);
+
+    setTimeout(() => {
+        beep(880, .1, "square", .04);
+    }, 70);
+}
+
+function soundGameOver() {
+    beep(220, .12, "sawtooth", .04);
+
+    setTimeout(() => {
+        beep(165, .15, "sawtooth", .035);
+    }, 130);
+}
+
+
+/* =========================
+   遊戲初始化
+   ========================= */
+
+function createBoard() {
+    return Array.from(
+        { length: ROWS },
+        () => Array(COLS).fill(0)
+    );
+}
+
+function randomPiece() {
+    const keys = Object.keys(pieces);
+    const key = keys[Math.floor(Math.random() * keys.length)];
+
+    return {
+        matrix: pieces[key].map(row => [...row]),
+        x: 0,
+        y: 0
+    };
+}
+
+function resetPiece() {
+    current = nextPiece || randomPiece();
+    nextPiece = randomPiece();
+
+    current.y = 0;
+    current.x =
+        Math.floor(COLS / 2) -
+        Math.floor(current.matrix[0].length / 2);
+
+    drawNext();
+
+    if (collide()) {
+        endGame();
+    }
+}
+
+function restart() {
+    initAudio();
+
+    board = createBoard();
+
+    score = 0;
+    lines = 0;
+    level = 1;
+
+    dropInterval = 800;
+    dropCounter = 0;
+
+    paused = false;
+    gameOver = false;
+
+    document.getElementById("overlay").classList.remove("show");
+    document.getElementById("pauseBtn").textContent = "⏸ 暫停";
+
+    updateStats();
+
+    nextPiece = randomPiece();
+    resetPiece();
+
+    lastTime = performance.now();
+}
+
+function updateStats() {
+    document.getElementById("score").textContent = score;
+    document.getElementById("lines").textContent = lines;
+    document.getElementById("level").textContent = level;
+
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem("tetrisHighScore", highScore);
+    }
+
+    document.getElementById("highScore").textContent = highScore;
+}
+
+
+/* =========================
+   繪圖
+   ========================= */
+
+function drawCell(context, x, y, color, size) {
+    context.fillStyle = colors[color];
+
+    context.fillRect(
+        x * size,
+        y * size,
+        size,
+        size
+    );
+
+    context.strokeStyle = "rgba(0,0,0,.28)";
+    context.lineWidth = 1;
+    context.strokeRect(
+        x * size + .5,
+        y * size + .5,
+        size - 1,
+        size - 1
+    );
+
+    // 高光
+    context.fillStyle = "rgba(255,255,255,.18)";
+    context.fillRect(
+        x * size + 3,
+        y * size + 3,
+        size - 6,
+        3
+    );
+}
+
+function drawMatrix(matrix, offset, context = ctx, size = BLOCK) {
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value) {
+                drawCell(
+                    context,
+                    x + offset.x,
+                    y + offset.y,
+                    value,
+                    size
+                );
+            }
+        });
+    });
+}
+
+function drawGrid() {
+    ctx.strokeStyle = "rgba(255,255,255,.045)";
+    ctx.lineWidth = 1;
+
+    for (let x = 0; x <= COLS; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * BLOCK + .5, 0);
+        ctx.lineTo(x * BLOCK + .5, ROWS * BLOCK);
+        ctx.stroke();
+    }
+
+    for (let y = 0; y <= ROWS; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * BLOCK + .5);
+        ctx.lineTo(COLS * BLOCK, y * BLOCK + .5);
+        ctx.stroke();
+    }
+}
+
+function drawGhost() {
+    if (!current) return;
+
+    let ghostY = current.y;
+
+    while (!collide({
+        x: current.x,
+        y: ghostY + 1
+    })) {
+        ghostY++;
+    }
+
+    ctx.globalAlpha = .18;
+    drawMatrix(
+        current.matrix,
+        { x: current.x, y: ghostY }
+    );
+    ctx.globalAlpha = 1;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#080b14";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawGrid();
+
+    drawMatrix(board, { x: 0, y: 0 });
+    drawGhost();
+
+    if (current) {
+        drawMatrix(
+            current.matrix,
+            { x: current.x, y: current.y }
+        );
+    }
+}
+
+function drawNext() {
+    nextCtx.clearRect(
+        0,
+        0,
+        nextCanvas.width,
+        nextCanvas.height
+    );
+
+    nextCtx.fillStyle = "#11162a";
+    nextCtx.fillRect(
+        0,
+        0,
+        nextCanvas.width,
+        nextCanvas.height
+    );
+
+    if (!nextPiece) return;
+
+    const matrix = nextPiece.matrix;
+
+    const size = 23;
+
+    const offsetX =
+        Math.floor(
+            (nextCanvas.width / size - matrix[0].length) / 2
+        );
+
+    const offsetY =
+        Math.floor(
+            (nextCanvas.height / size - matrix.length) / 2
+        );
+
+    drawMatrix(
+        matrix,
+        {
+            x: offsetX,
+            y: offsetY
+        },
+        nextCtx,
+        size
+    );
+}
+
+
+/* =========================
+   碰撞 / 固定
+   ========================= */
+
+function collide(pos = current) {
+    const matrix = current.matrix;
+
+    for (let y = 0; y < matrix.length; y++) {
+        for (let x = 0; x < matrix[y].length; x++) {
+
+            if (!matrix[y][x]) continue;
+
+            const boardX = x + pos.x;
+            const boardY = y + pos.y;
+
+            if (
+                boardX < 0 ||
+                boardX >= COLS ||
+                boardY >= ROWS
+            ) {
+                return true;
+            }
+
+            if (
+                boardY >= 0 &&
+                board[boardY][boardX]
+            ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function merge() {
+    current.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+
+            if (value) {
+                const by = y + current.y;
+                const bx = x + current.x;
+
+                if (
+                    by >= 0 &&
+                    by < ROWS &&
+                    bx >= 0 &&
+                    bx < COLS
+                ) {
+                    board[by][bx] = value;
+                }
+            }
+
+        });
+    });
+}
+
+
+/* =========================
+   消行
+   ========================= */
+
+function clearLines() {
+    let cleared = 0;
+
+    outer:
+    for (let y = ROWS - 1; y >= 0; y--) {
+
+        for (let x = 0; x < COLS; x++) {
+            if (!board[y][x]) {
+                continue outer;
+            }
+        }
+
+        board.splice(y, 1);
+        board.unshift(Array(COLS).fill(0));
+
+        cleared++;
+        y++;
+    }
+
+    if (cleared > 0) {
+
+        const points = [
+            0,
+            100,
+            300,
+            500,
+            800
+        ];
+
+        score += points[cleared] * level;
+        lines += cleared;
+
+        level =
+            Math.floor(lines / 10) + 1;
+
+        dropInterval =
+            Math.max(
+                80,
+                800 - (level - 1) * 65
+            );
+
+        soundLine();
+        updateStats();
+    }
+}
+
+
+/* =========================
+   移動
+   ========================= */
+
+function move(dir) {
+    if (paused || gameOver) return;
+
+    current.x += dir;
+
+    if (collide()) {
+        current.x -= dir;
+    } else {
+        soundMove();
+    }
+
+    draw();
+}
+
+function softDrop() {
+    if (paused || gameOver) return;
+
+    current.y++;
+
+    if (collide()) {
+        current.y--;
+        lockPiece();
+    } else {
+        score += 1;
+        updateStats();
+    }
+
+    dropCounter = 0;
+    draw();
+}
+
+function hardDrop() {
+    if (paused || gameOver) return;
+
+    let distance = 0;
+
+    while (!collide({
+        x: current.x,
+        y: current.y + 1
+    })) {
+        current.y++;
+        distance++;
+    }
+
+    score += distance * 2;
+
+    soundDrop();
+
+    lockPiece();
+    updateStats();
+    draw();
+}
+
+
+/* =========================
+   旋轉
+   ========================= */
+
+function rotateMatrix(matrix) {
+    const result = matrix[0].map(
+        (_, index) =>
+            matrix.map(row => row[index]).reverse()
+    );
+
+    return result;
+}
+
+function rotate() {
+    if (paused || gameOver) return;
+
+    const oldMatrix = current.matrix;
+    const oldX = current.x;
+
+    current.matrix = rotateMatrix(current.matrix);
+
+    // Wall kick
+    const kicks = [0, -1, 1, -2, 2];
+
+    let success = false;
+
+    for (const kick of kicks) {
+
+        current.x = oldX + kick;
+
+        if (!collide()) {
+            success = true;
+            break;
+        }
+    }
+
+    if (!success) {
+        current.matrix = oldMatrix;
+        current.x = oldX;
+    } else {
+        soundRotate();
+    }
+
+    draw();
+}
+
+
+/* =========================
+   固定方塊
+   ========================= */
+
+function lockPiece() {
+    merge();
+
+    clearLines();
+
+    soundDrop();
+
+    resetPiece();
+}
+
+
+/* =========================
+   遊戲結束
+   ========================= */
+
+function endGame() {
+    gameOver = true;
+
+    soundGameOver();
+
+    document.getElementById("overlayTitle").textContent =
+        "遊戲結束";
+
+    document.getElementById("overlayText").textContent =
+        `你的分數：${score}`;
+
+    document.getElementById("overlay").classList.add("show");
+
+    updateStats();
+}
+
+
+/* =========================
+   暫停
+   ========================= */
+
+function togglePause() {
+    if (gameOver) return;
+
+    paused = !paused;
+
+    document.getElementById("pauseBtn").textContent =
+        paused ? "▶ 繼續" : "⏸ 暫停";
+
+    draw();
+}
+
+
+/* =========================
+   音效開關
+   ========================= */
+
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+
+    const button =
+        document.getElementById("soundBtn");
+
+    button.textContent =
+        soundEnabled
+            ? "🔊 音效：開"
+            : "🔇 音效：關";
+
+    button.classList.toggle(
+        "sound-on",
+        soundEnabled
+    );
+
+    if (soundEnabled) {
+        initAudio();
+        beep(500, .08);
+    }
+}
+
+
+/* =========================
+   鍵盤
+   ========================= */
+
+document.addEventListener("keydown", event => {
+
+    if (
+        ["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "]
+            .includes(event.key)
+    ) {
+        event.preventDefault();
+    }
+
+    if (event.key === "ArrowLeft") {
+        move(-1);
+    }
+
+    else if (event.key === "ArrowRight") {
+        move(1);
+    }
+
+    else if (event.key === "ArrowDown") {
+        softDrop();
+    }
+
+    else if (event.key === "ArrowUp") {
+        rotate();
+    }
+
+    else if (event.code === "Space") {
+        hardDrop();
+    }
+
+    else if (event.key.toLowerCase() === "p") {
+        togglePause();
+    }
+
+    else if (event.key.toLowerCase() === "m") {
+        toggleSound();
+    }
+});
+
+
+/* =========================
+   遊戲主迴圈
+   ========================= */
+
+function update(time = 0) {
+
+    const delta = time - lastTime;
+    lastTime = time;
+
+    if (!paused && !gameOver) {
+
+        dropCounter += delta;
+
+        if (dropCounter > dropInterval) {
+
+            current.y++;
+
+            if (collide()) {
+                current.y--;
+                lockPiece();
+            }
+
+            dropCounter = 0;
+        }
+    }
+
+    draw();
+
+    requestAnimationFrame(update);
+}
+
+
+/* =========================
+   啟動
+   ========================= */
+
+restart();
+update();
+
+</script>
+
+</body>
+</html>
+```
